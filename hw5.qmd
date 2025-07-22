@@ -69,3 +69,28 @@ new_heart <- heart |>
   mutate(HD_Indicator = as.factor(HeartDisease)) |>
   select(-ST_Slope, -HeartDisease)
 ```
+
+
+## Task 3: EDA
+
+### Question 1
+
+```{r}
+## load ggplot
+library(ggplot2)
+
+## plot visual
+ggplot(new_heart, aes(x = MaxHR, y = Age, color = HD_Indicator)) + 
+  geom_point(alpha = 0.75) +
+  geom_smooth(method = "lm", se = FALSE) + 
+  scale_color_brewer(palette = "Set1") +
+  labs(
+  title = "Age vs. Max Heart Rate by Heart Disease Status",
+  x = "Maximum Heart Rate",
+  y = "Age")
+```
+
+
+### Question 2
+
+Based on the plot above, I think an interaction model is more appropriate here due to the differing slopes for each factor of the heart disease indicator.
