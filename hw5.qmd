@@ -90,7 +90,19 @@ ggplot(new_heart, aes(x = MaxHR, y = Age, color = HD_Indicator)) +
   y = "Age")
 ```
 
-
 ### Question 2
 
 Based on the plot above, I think an interaction model is more appropriate here due to the differing slopes for each factor of the heart disease indicator.
+
+## Task 4: Testing and Training
+
+```{r}
+## set seed
+set.seed(101)
+
+## split the data into train and test sets
+heart_split <- initial_split(new_heart, prop = 0.8)
+train <- training(heart_split)
+test <- testing(heart_split)
+```
+
