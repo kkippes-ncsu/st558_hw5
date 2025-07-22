@@ -4,12 +4,8 @@ author: Kayla Kippes
 format: pdf
 editor: visual
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
-
-```{r setup, include=FALSE} 
-knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
-```
 
 ## Task 1: Conceptual Questions
 
@@ -32,7 +28,6 @@ Adding an interaction term allows for the value of one predictor be dependent on
 - Why do we split our data into a training and test set?
 
 We split our data into a training and test set so that the model can be fit on data it has never seen before. It can learn from the training data and from there we can evaluate it's performance on the test data.
-
 
 ## Task 2: Data Prep
 
@@ -70,7 +65,6 @@ new_heart <- heart |>
   select(-ST_Slope, -HeartDisease)
 ```
 
-
 ## Task 3: EDA
 
 ### Question 1
@@ -106,3 +100,94 @@ train <- training(heart_split)
 test <- testing(heart_split)
 ```
 
+## Task 5: OLS and LASSO
+
+### Question 1
+
+```{r}
+## Fit an interaction model
+ols_mlr <- lm(Age ~ MaxHR * HD_Indicator, data = train)
+
+## summary of the output
+summary(ols_mlr)
+```
+
+### Question 2
+
+```{r}
+#look at a few observations and predictions
+test |>
+  mutate(model_preds = predict(ols_mlr, newdata = test)) |>
+  rmse(truth = Age, estimate = model_preds)
+```
+
+### Question 3
+
+```{r}
+## set up cv folds
+cv_folds <- vfold_cv(train, 10)
+
+## set up LASSO recipe
+LASSO_recipe <- recipe(Age ~ MaxHR + HD_Indicator, data = train) |>
+  step_dummy(all_nominal_predictors()) |> ## convert to dummary varaible
+  step_normalize(all_predictors()) |> ## standardize to normal
+  step_interact(terms = ~ MaxHR:starts_with("HD_Indicator"))
+LASSO_recipe
+```
+
+### Question 4
+
+```{r}
+## Spec
+LASSO_spec <- linear_reg(penalty = tune(), mixture = 1) |>
+  set_engine("glmnet")
+
+## Workflow
+LASSO_workflow <- workflow() |>
+  add_recipe(LASSO_recipe) |>
+  add_model(LASSO_spec)
+
+## Grid
+LASSO_grid <- LASSO_workflow |>
+  tune_grid(resamples = cv_folds,
+            grid = grid_regular(penalty(),
+                                levels = 200))
+
+## Best model
+LASSO_best <- LASSO_grid |>
+  select_best(metric = "rmse")
+
+## Finalize
+final_LASSO <- LASSO_workflow |>
+  finalize_workflow(LASSO_best) |>
+  fit(train)
+
+tidy(final_LASSO)
+```
+
+### Question 5
+
+I would expect the RMSE calculations to be roughly the same. This is because the penalty in the LASSO model is close to 0 so it should essentially be like an OLS model.
+
+### Question 6
+
+```{r}
+#Calculate test RMSE
+ols_rmse <- sqrt(mean((test$Age-predict(ols_mlr,newdata = test))^2))
+
+# Get rmse from our LASSO model
+LASSO_test_rmse <- LASSO_workflow |> 
+  finalize_workflow(LASSO_best) |> 
+  last_fit(heart_split) |> 
+  collect_metrics() |> 
+  filter(.metric == "rmse")
+
+# Combine our metrics
+rbind(ols_rmse, LASSO_test_rmse) |> 
+  mutate(Model = c("OLS", "LASSO")) |> 
+  select(Model, everything())
+```
+
+### Question 7
+
+Although the models may have different coefficients, the RMSE's were the same. This is because LASSO shrinks coefficients but because there was not as large of a penalty, there wasn't severe shrinkage and the number of predictors was essentially unchanged.
