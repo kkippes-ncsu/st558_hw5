@@ -137,7 +137,7 @@ LASSO_recipe
 
 ### Question 4
 
-```{r}
+```{r warning=FALSE}
 ## Spec
 LASSO_spec <- linear_reg(penalty = tune(), mixture = 1) |>
   set_engine("glmnet")
@@ -191,3 +191,65 @@ rbind(ols_rmse, LASSO_test_rmse) |>
 ### Question 7
 
 Although the models may have different coefficients, the RMSE's were the same. This is because LASSO shrinks coefficients but because there was not as large of a penalty, there wasn't severe shrinkage and the number of predictors was essentially unchanged.
+
+## Task 6: Logistic Regression
+
+### Question 1
+
+```{r}
+## Set up two different logistic regression models
+
+## Model 1
+LR1_rec <- recipe(HD_Indicator ~ Age + RestingBP, data = train) |>
+  step_normalize(all_predictors())
+
+LR2_rec <- recipe(HD_Indicator ~ Age + RestingBP + Cholesterol + MaxHR, data = train) |>
+  step_normalize(all_predictors())
+
+## spec for both models
+LR_spec <- logistic_reg() |>
+  set_engine("glm")
+
+## create workflows
+LR1_wkf <- workflow() |>
+ add_recipe(LR1_rec) |>
+ add_model(LR_spec)
+
+LR2_wkf <- workflow() |>
+ add_recipe(LR2_rec) |>
+ add_model(LR_spec)
+
+## Fit to the CV folds
+LR1_fit <- LR1_wkf |>
+ fit_resamples(cv_folds, metrics = metric_set(accuracy, mn_log_loss))
+
+LR2_fit <- LR2_wkf |>
+ fit_resamples(cv_folds, metrics = metric_set(accuracy, mn_log_loss))
+
+## Combine and see which did best
+rbind(LR1_fit |> collect_metrics(),
+ LR2_fit |> collect_metrics()) |>
+ mutate(Model = c("Model1", "Model1", "Model2", "Model2")) |>
+ select(Model, everything())
+```
+
+Model 2 (using Age, Resting BP, Cholesterol, and MaxHR) is the best one due to higher accuracy and lower log loss - although it is not too much better.
+
+### Question 2
+
+```{r}
+## Fit the best model
+final_LR_fit <- LR2_wkf |>
+  fit(train)
+
+conf_mat(test |> mutate(estimate = final_LR_fit |> predict(test) |> pull()), 
+ HD_Indicator,
+ estimate)
+```
+
+### Question 3
+
+Sensitivity: Of all the people who have heart disease, the model correctly identified 69 out of the 184 (true positive rate).
+
+Specificity: Of all the people who DO NOT have heart disease, the model correctly identified 70 out of the 184 (true negative rate).
+
